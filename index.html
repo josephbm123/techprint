@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechPro | Gestión de Carrito</title>
+    <style>
+        :root { --primary: #2563eb; --dark: #0f172a; --whatsapp: #25d366; --gray: #f8fafc; --danger: #ef4444; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--gray); color: #334155; }
+        
+        header { background: var(--dark); color: white; padding: 1rem 5%; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; }
+        .search-bar input { padding: 8px 15px; border-radius: 20px; border: none; outline: none; width: 200px; }
+
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 350px; gap: 2rem; }
+        
+        .products-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; }
+        .card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; transition: 0.3s; }
+        .card:hover { transform: translateY(-5px); }
+        .card img { width: 100%; height: 180px; object-fit: cover; cursor: pointer; }
+        .card-info { padding: 1rem; text-align: center; }
+        
+        .price { font-size: 1.4rem; font-weight: 800; color: var(--primary); margin: 10px 0; }
+        .add-btn { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
+
+        /* MODAL */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-content { background: white; padding: 2rem; border-radius: 20px; max-width: 450px; width: 90%; position: relative; }
+        .close-modal { position: absolute; top: 15px; right: 20px; font-size: 1.5rem; cursor: pointer; }
+        
+        .selector-group { margin: 15px 0; text-align: left; }
+        .selector-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; }
+        select, .qty-input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 1rem; }
+        
+        /* CARRITO CON ELIMINAR */
+        .cart-panel { background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 10px 15px rgba(0,0,0,0.1); height: fit-content; position: sticky; top: 100px; }
+        .cart-item { padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: flex-start; }
+        .cart-item-info { flex-grow: 1; }
+        .cart-item strong { display: block; color: var(--dark); }
+        .cart-item small { color: #64748b; }
+        .btn-del { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1.2rem; padding: 0 5px; }
+        
+        .empty-btn { background: #f1f5f9; color: #64748b; border: none; padding: 8px; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 10px; font-size: 0.8rem; }
+        .empty-btn:hover { background: #fee2e2; color: var(--danger); }
+
+        .whatsapp-btn { background: var(--whatsapp); color: white; text-decoration: none; display: block; text-align: center; padding: 15px; border-radius: 8px; font-weight: bold; margin-top: 1rem; }
+
+        @media (max-width: 900px) { .container { grid-template-columns: 1fr; } .cart-panel { position: static; } }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>TECHPRO</h1>
+    <div class="search-bar"><input type="text" id="buscador" placeholder="🔍 Buscar..." onkeyup="buscarProducto()"></div>
+    <div>🛒 <span id="cart-count">0</span></div>
+</header>
+
+<div class="container">
+    <main class="products-grid" id="products-container"></main>
+
+    <aside class="cart-panel">
+        <h3 style="margin-top:0">Tu Carrito</h3>
+        <div id="cart-items"></div>
+        
+        <div id="cart-summary" style="display: none;">
+            <div style="font-size: 1.5rem; font-weight: bold; margin: 1.5rem 0; text-align: right; border-top: 2px solid #eee; padding-top: 10px;">
+                Total: $<span id="cart-total">0</span>
+            </div>
+            <a href="#" class="whatsapp-btn" onclick="enviarWhatsApp()">🚀 Finalizar Pedido</a>
+            <button class="empty-btn" onclick="vaciarCarrito()">🗑️ Vaciar todo el carrito</button>
+        </div>
+        <div id="cart-empty-msg" style="text-align: center; color: #94a3b8; padding: 20px;">El carrito está vacío</div>
+    </aside>
+</div>
+
+<div id="miModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="cerrarModal()">&times;</span>
+        <img id="modalImg" src="" style="width:100%; max-height:200px; object-fit:contain; margin-bottom:15px;">
+        <h2 id="modalTitle" style="margin:0;"></h2>
+        <p id="modalDesc" style="font-size:0.9rem; color:#64748b; margin:10px 0;"></p>
+        
+        <div class="selector-group">
+            <label id="labelVariante">Opción:</label>
+            <select id="selectVariante"></select>
+        </div>
+        <div class="selector-group">
+            <label>Cantidad:</label>
+            <input type="number" id="modalQty" class="qty-input" value="1" min="1">
+        </div>
+        <p class="price" id="modalPrice"></p>
+        <button class="add-btn" id="modalAddBtn">Añadir al Carrito</button>
+    </div>
+</div>
+
+<script>
+    const productos = [
+        { id: 0, name: 'iPhone 15 Pro Max', price: 1199, img: 'iphone15.png.png', tipoVariante: 'Color', opciones: ['Titanio Natural', 'Titanio Azul', 'Titanio Negro'], desc: 'Pantalla Super Retina XDR y Chip A17 Pro.' },
+        { id: 1, name: 'PC Gaming RTX 4080', price: 2450, img: 'rtx4080.jpg', tipoVariante: 'Modelos', opciones: ['MSI', 'ASUS', 'Gigabyte'], desc: 'La bestia del gaming y la edición.' },
+        { id: 2, name: 'Tóner Láser Especial', price: 65, img: 'toner.jpg', tipoVariante: 'Color / Presentación', opciones: ['Negro (Black)', 'Cian (Azul)', 'Magenta (Rosa)', 'Amarillo (Yellow)', '✨ PACK COMPLETO (4 colores) (+ $180)'], desc: 'Tóner profesional. El Pack incluye los 4 colores (CMYK).' }
+    ];
+
+    let cart = [];
+    let total = 0;
+    const miTelefono = "04143234315"; 
+
+    function renderProducts(items) {
+        const container = document.getElementById('products-container');
+        container.innerHTML = items.map(p => `
+            <div class="card">
+                <img src="${p.img}" onclick="abrirDetalles(${p.id})">
+                <div class="card-info">
+                    <h3 onclick="abrirDetalles(${p.id})" style="cursor:pointer">${p.name}</h3>
+                    <p class="price">$${p.price}</p>
+                    <button class="add-btn" onclick="abrirDetalles(${p.id})">Ver Opciones</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function abrirDetalles(id) {
+        const p = productos.find(x => x.id === id);
+        document.getElementById('modalImg').src = p.img;
+        document.getElementById('modalTitle').innerText = p.name;
+        document.getElementById('modalDesc').innerText = p.desc;
+        document.getElementById('modalPrice').innerText = '$' + p.price;
+        document.getElementById('modalQty').value = 1;
+        document.getElementById('labelVariante').innerText = 'Seleccionar ' + p.tipoVariante + ':';
+        const select = document.getElementById('selectVariante');
+        select.innerHTML = p.opciones.map(o => `<option value="${o}">${o}</option>`).join('');
+
+        document.getElementById('modalAddBtn').onclick = () => {
+            addToCart(p.name, p.price, p.tipoVariante, select.value, parseInt(document.getElementById('modalQty').value) || 1);
+            cerrarModal();
+        };
+        document.getElementById('miModal').style.display = "flex";
+    }
+
+    function cerrarModal() { document.getElementById('miModal').style.display = "none"; }
+
+    function addToCart(name, price, tipoVar, opcion, qty) {
+        let precioBase = price;
+        if(opcion.includes('+ $')) precioBase += parseInt(opcion.split('$')[1]);
+        const subtotal = precioBase * qty;
+        
+        cart.push({ id: Date.now(), name, price: subtotal, detalle: `${tipoVar}: ${opcion}`, qty });
+        total += subtotal;
+        updateUI();
+    }
+
+    // --- NUEVAS FUNCIONES PARA ELIMINAR ---
+    function eliminarProducto(id) {
+        const index = cart.findIndex(item => item.id === id);
+        if (index > -1) {
+            total -= cart[index].price;
+            cart.splice(index, 1);
+            updateUI();
+        }
+    }
+
+    function vaciarCarrito() {
+        if(confirm("¿Seguro que quieres vaciar todo el carrito?")) {
+            cart = [];
+            total = 0;
+            updateUI();
+        }
+    }
+    // ---------------------------------------
+
+    function updateUI() {
+        const list = document.getElementById('cart-items');
+        const summary = document.getElementById('cart-summary');
+        const emptyMsg = document.getElementById('cart-empty-msg');
+
+        if (cart.length === 0) {
+            list.innerHTML = "";
+            summary.style.display = "none";
+            emptyMsg.style.display = "block";
+        } else {
+            summary.style.display = "block";
+            emptyMsg.style.display = "none";
+            list.innerHTML = cart.map(item => `
+                <div class="cart-item">
+                    <div class="cart-item-info">
+                        <strong>${item.qty}x ${item.name}</strong>
+                        <small>${item.detalle}</small>
+                        <div style="font-weight:bold; margin-top:3px;">$${item.price.toLocaleString()}</div>
+                    </div>
+                    <button class="btn-del" onclick="eliminarProducto(${item.id})">×</button>
+                </div>
+            `).join('');
+        }
+        document.getElementById('cart-total').innerText = total.toLocaleString();
+        document.getElementById('cart-count').innerText = cart.length;
+    }
+
+    function buscarProducto() {
+        const q = document.getElementById('buscador').value.toLowerCase();
+        renderProducts(productos.filter(p => p.name.toLowerCase().includes(q)));
+    }
+
+    function enviarWhatsApp() {
+        if (cart.length === 0) return alert("Carrito vacío");
+        let msg = "🛒 *NUEVO PEDIDO TECHPRO*%0A%0A";
+        cart.forEach(i => msg += `✅ *${i.qty}x ${i.name}*%0A   ${i.detalle}%0A   Subtotal: $${i.price}%0A%0A`);
+        msg += `💰 *TOTAL A PAGAR: $${total}*`;
+        window.open(`https://wa.me/${miTelefono}?text=${msg}`, '_blank');
+    }
+
+    renderProducts(productos);
+    window.onclick = (e) => { if(e.target == document.getElementById('miModal')) cerrarModal(); };
+</script>
+</body>
+</html>
